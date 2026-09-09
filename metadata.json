@@ -1,0 +1,6 @@
+{
+  "name": "Hệ Thống Quản Trị Phân Quyền & Xác Thực",
+  "description": "Ứng dụng xác thực, quản lý kho tài liệu & upload hình ảnh đa nguồn có tiến độ lưu và xuất file, kèm phân trang và tìm kiếm phía server.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
