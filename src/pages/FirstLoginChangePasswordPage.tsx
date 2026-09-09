@@ -19,9 +19,9 @@ export const FirstLoginChangePasswordPage: React.FC = () => {
   const location = useLocation();
   const { pendingFirstLoginUser, changePasswordFirstLogin, user } = useAuth();
 
-  const stateData = (location.state as { email?: string; currentPassword?: string }) || {};
-  const defaultEmail = stateData.email || pendingFirstLoginUser?.email || user?.email || 'user.firstlogin@system.com';
-  const defaultCurrentPass = stateData.currentPassword || (defaultEmail === 'user.firstlogin@system.com' ? 'Temp@12345' : '');
+  const stateData = (location.state as { email?: string }) || {};
+  const defaultEmail = stateData.email || pendingFirstLoginUser?.email || user?.email || '';
+  const defaultCurrentPass = '';
 
   const [email] = useState(defaultEmail);
   const [currentPassword, setCurrentPassword] = useState(defaultCurrentPass);
@@ -33,12 +33,12 @@ export const FirstLoginChangePasswordPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Password validation checks
-  const hasMinLength = newPassword.length >= 6;
+  const hasMinLength = newPassword.length >= 8 && newPassword.length <= 4096;
   const hasNumber = /\d/.test(newPassword);
   const hasLetter = /[a-zA-Z]/.test(newPassword);
   const isMatch = newPassword === confirmPassword && newPassword.length > 0;
   const isDifferentFromOld = newPassword !== currentPassword;
-  const isValid = hasMinLength && hasNumber && hasLetter && isMatch && isDifferentFromOld;
+  const isValid = hasMinLength && !!newPassword.trim() && isMatch && isDifferentFromOld;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +65,7 @@ export const FirstLoginChangePasswordPage: React.FC = () => {
       // "đổi mật khẩu xong sẽ call api cập nhật is_first_login = false rồi call api login luôn"
       setStatusStep(1); // Call API cập nhật mật khẩu & is_first_login = false
 
-      await new Promise((r) => setTimeout(r, 400)); // slight pause for clear step feedback
+
 
       setStatusStep(2); // Call API login luôn
       const res = await changePasswordFirstLogin(email, currentPassword, newPassword);
@@ -239,7 +239,7 @@ export const FirstLoginChangePasswordPage: React.FC = () => {
             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] space-y-1 text-slate-600">
               <div className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-700' : 'text-slate-400'}`}>
                 <CheckCircle2 className={`w-3.5 h-3.5 ${hasMinLength ? 'text-emerald-600' : 'text-slate-300'}`} />
-                <span>Ít nhất 6 ký tự</span>
+                <span>Ít nhất 8 ký tự</span>
               </div>
               <div className={`flex items-center gap-1.5 ${hasNumber && hasLetter ? 'text-emerald-700' : 'text-slate-400'}`}>
                 <CheckCircle2 className={`w-3.5 h-3.5 ${hasNumber && hasLetter ? 'text-emerald-600' : 'text-slate-300'}`} />
@@ -272,20 +272,7 @@ export const FirstLoginChangePasswordPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick filler button for instant test */}
-          <div className="mt-4 pt-3 border-t border-slate-100 text-center">
-            <button
-              type="button"
-              id="btn-quick-fill-new-pass"
-              onClick={() => {
-                setNewPassword('SecurePass@2025');
-                setConfirmPassword('SecurePass@2025');
-              }}
-              className="text-[11px] text-amber-700 hover:underline font-medium"
-            >
-              ⚡ Tự động điền mật khẩu mẫu hợp lệ: "SecurePass@2025"
-            </button>
-          </div>
+
         </div>
       </div>
     </div>

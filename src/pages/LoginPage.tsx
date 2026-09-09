@@ -8,8 +8,8 @@ export const LoginPage: React.FC = () => {
   const location = useLocation();
   const { login, isLoading } = useAuth();
 
-  const [email, setEmail] = useState('admin@system.com');
-  const [password, setPassword] = useState('Admin@123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
@@ -37,7 +37,7 @@ export const LoginPage: React.FC = () => {
       if (res.is_first_login) {
         setInfoMessage('Tài khoản lần đầu đăng nhập. Đang chuyển đến màn hình đổi mật khẩu...');
         setTimeout(() => {
-          navigate('/change-password-first-login', { state: { email, currentPassword: password } });
+          navigate('/change-password-first-login', { state: { email } });
         }, 500);
         return;
       }
@@ -48,13 +48,6 @@ export const LoginPage: React.FC = () => {
       const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi kết nối máy chủ';
       setError(msg);
     }
-  };
-
-  const setPreset = (presetEmail: string, presetPass: string) => {
-    setEmail(presetEmail);
-    setPassword(presetPass);
-    setError(null);
-    setInfoMessage(null);
   };
 
   return (
@@ -132,7 +125,7 @@ export const LoginPage: React.FC = () => {
                 <label htmlFor="input-password" className="block text-xs font-semibold text-slate-700">
                   Mật khẩu
                 </label>
-                <span className="text-[11px] text-slate-400">Tối thiểu 6 ký tự</span>
+                <span className="text-[11px] text-slate-400">Mật khẩu tài khoản của bạn</span>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -167,79 +160,7 @@ export const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick Demo Credentials Box */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5">
-              Tài khoản mẫu để kiểm tra nhanh:
-            </p>
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                id="btn-preset-admin"
-                onClick={() => setPreset('admin@system.com', 'Admin@123')}
-                className={`w-full text-left p-2.5 rounded-xl border text-xs transition-all flex items-center justify-between ${
-                  email === 'admin@system.com'
-                    ? 'border-indigo-500 bg-indigo-50/50'
-                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
-                }`}
-              >
-                <div>
-                  <div className="font-semibold text-slate-900 flex items-center gap-1.5">
-                    <span>👑 Admin mặc định (Super)</span>
-                    {email === 'admin@system.com' && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />}
-                  </div>
-                  <div className="text-[11px] text-slate-500">admin@system.com • Admin@123</div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 font-medium">
-                  Toàn quyền
-                </span>
-              </button>
 
-              <button
-                type="button"
-                id="btn-preset-firstlogin"
-                onClick={() => setPreset('user.firstlogin@system.com', 'Temp@12345')}
-                className={`w-full text-left p-2.5 rounded-xl border text-xs transition-all flex items-center justify-between ${
-                  email === 'user.firstlogin@system.com'
-                    ? 'border-amber-500 bg-amber-50/50'
-                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
-                }`}
-              >
-                <div>
-                  <div className="font-semibold text-amber-900 flex items-center gap-1.5">
-                    <span>⚡ User đổi mật khẩu lần đầu</span>
-                    {email === 'user.firstlogin@system.com' && <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />}
-                  </div>
-                  <div className="text-[11px] text-slate-500">user.firstlogin@system.com • Temp@12345</div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
-                  is_first_login = true
-                </span>
-              </button>
-
-              <button
-                type="button"
-                id="btn-preset-manager"
-                onClick={() => setPreset('manager@system.com', 'Manager@123')}
-                className={`w-full text-left p-2.5 rounded-xl border text-xs transition-all flex items-center justify-between ${
-                  email === 'manager@system.com'
-                    ? 'border-blue-500 bg-blue-50/50'
-                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
-                }`}
-              >
-                <div>
-                  <div className="font-semibold text-slate-900 flex items-center gap-1.5">
-                    <span>👔 Trưởng phòng (Manager)</span>
-                    {email === 'manager@system.com' && <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />}
-                  </div>
-                  <div className="text-[11px] text-slate-500">manager@system.com • Manager@123</div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-medium">
-                  Quản lý
-                </span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

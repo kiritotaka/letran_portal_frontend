@@ -404,9 +404,9 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  const REMOTE_BACKEND_URL = process.env.BACKEND_API_URL || 'https://letran-backend.onrender.com/api/v1';
+  const REMOTE_BACKEND_URL = process.env.BACKEND_API_URL || 'https://letran-portal-backend.onrender.com/api/v1';
 
-  // 0. PROXY /api/v1 SANG REAL BACKEND (https://letran-backend.onrender.com/api/v1)
+  // 0. PROXY /api/v1 SANG REAL BACKEND (https://letran-portal-backend.onrender.com/api/v1)
   // Cho phép gọi API backend thật mà không bị lỗi CORS chặn trên trình duyệt
   app.use('/api/v1', async (req: Request, res: Response) => {
     const subPath = req.url; // e.g. /auth/login hoặc /auth/login?query=...

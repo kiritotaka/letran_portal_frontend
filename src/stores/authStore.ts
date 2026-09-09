@@ -1,147 +1,131 @@
-import { create } from 'zustand';
-import { User, Role } from '../types';
-
+import { create } from "zustand";
+import { User, Role } from "../types";
+import type { SessionData } from "../services/sessionTypes";
 export interface PendingFirstLoginUser {
   email: string;
   name: string;
 }
-
+const KEY = "letran_session_v1";
+let saved: SessionData | null = null;
+try {
+  for (const key of [
+    "auth_token",
+    "auth_user",
+    "auth_role",
+    "auth_permissions",
+  ])
+    localStorage.removeItem(key);
+  saved = JSON.parse(sessionStorage.getItem(KEY) || "null");
+  if (!saved?.refresh_token || !saved?.user?.id) saved = null;
+} catch {
+  saved = null;
+}
 interface AuthState {
   user: User | null;
   role: Role | null;
   permissions: string[];
   token: string | null;
+  refreshToken: string | null;
+  expiresAt: number | null;
+  revision: number;
   isLoading: boolean;
   pendingFirstLoginUser: PendingFirstLoginUser | null;
-
-  // Actions
-  saveSession: (token: string, user: User, role: Role, permissions: string[]) => void;
+  saveSession: (data: SessionData) => void;
   clearSession: () => void;
-  setPendingFirstLoginUser: (pending: PendingFirstLoginUser | null) => void;
+  setPendingFirstLoginUser: (p: PendingFirstLoginUser | null) => void;
   setLoading: (loading: boolean) => void;
-  setUser: (user: User | null) => void;
-  setRole: (role: Role | null) => void;
-  setPermissions: (permissions: string[]) => void;
-
-  // Permissions checkers
   hasPermission: (code: string) => boolean;
   hasAnyPermission: (codes: string[]) => boolean;
   hasAllPermissions: (codes: string[]) => boolean;
 }
-
-// Safely get initial data from storage
-const getInitialState = () => {
-  try {
-    const savedToken = localStorage.getItem('auth_token');
-    const savedUser = localStorage.getItem('auth_user');
-    const savedRole = localStorage.getItem('auth_role');
-    const savedPermissions = localStorage.getItem('auth_permissions');
-    const savedPending = sessionStorage.getItem('pending_first_login');
-
-    return {
-      token: savedToken || null,
-      user: savedUser ? JSON.parse(savedUser) : null,
-      role: savedRole ? JSON.parse(savedRole) : null,
-      permissions: savedPermissions ? JSON.parse(savedPermissions) : [],
-      pendingFirstLoginUser: savedPending ? JSON.parse(savedPending) : null
-    };
-  } catch {
-    return {
-      token: null,
-      user: null,
-      role: null,
-      permissions: [],
-      pendingFirstLoginUser: null
-    };
-  }
-};
-
-const initial = getInitialState();
-
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: initial.user,
-  role: initial.role,
-  permissions: initial.permissions,
-  token: initial.token,
-  isLoading: false,
-  pendingFirstLoginUser: initial.pendingFirstLoginUser,
-
-  saveSession: (token, user, role, permissions) => {
+  user: null,
+  role: null,
+  permissions: [],
+  token: saved?.access_token || null,
+  refreshToken: saved?.refresh_token || null,
+  expiresAt: saved?.expires_at || null,
+  revision: 0,
+  isLoading: !!saved,
+  pendingFirstLoginUser: null,
+  saveSession: (data) => {
+    if (
+      !data.access_token ||
+      !data.refresh_token ||
+      !data.user?.id ||
+      !Array.isArray(data.user.permissions) ||
+      !Number.isFinite(data.expires_in)
+    )
+      throw new Error("Phiên không hợp lệ.");
+    const expiresAt =
+      data.expires_at ?? Math.floor(Date.now() / 1000) + data.expires_in;
     try {
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('auth_user', JSON.stringify(user));
-      localStorage.setItem('auth_role', JSON.stringify(role));
-      localStorage.setItem('auth_permissions', JSON.stringify(permissions));
-      sessionStorage.removeItem('pending_first_login');
+      sessionStorage.setItem(
+        KEY,
+        JSON.stringify({ ...data, expires_at: expiresAt }),
+      );
     } catch {
-      // ignore storage errors
+      /* memory fallback */
     }
-
-    set({
-      token,
+    const raw = data.user,
+      admin = raw.is_super_admin === true;
+    const permissions = admin ? ["*"] : raw.permissions;
+    const role: Role = {
+      id: admin ? "admin" : "staff",
+      name: admin ? "Quản trị viên" : "Người dùng",
+      description: "",
+      permissions,
+    };
+    const user: User = {
+      id: raw.id,
+      email: raw.email,
+      name: raw.email.split("@")[0],
+      roleId: role.id,
+      is_first_login: raw.is_first_login,
+      status: "active",
+      createdAt: "",
+    };
+    set((s) => ({
+      token: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt,
       user,
       role,
       permissions,
-      pendingFirstLoginUser: null
-    });
+      revision: s.revision + 1,
+      pendingFirstLoginUser: raw.is_first_login
+        ? { email: raw.email, name: raw.email }
+        : null,
+    }));
   },
-
   clearSession: () => {
     try {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
-      localStorage.removeItem('auth_role');
-      localStorage.removeItem('auth_permissions');
+      sessionStorage.removeItem(KEY);
+      sessionStorage.removeItem("pending_first_login");
     } catch {
-      // ignore
+      /* storage disabled */
     }
-
-    set({
+    set((s) => ({
       token: null,
+      refreshToken: null,
+      expiresAt: null,
       user: null,
       role: null,
-      permissions: []
-    });
+      permissions: [],
+      pendingFirstLoginUser: null,
+      revision: s.revision + 1,
+    }));
   },
-
-  setPendingFirstLoginUser: (pending) => {
-    try {
-      if (pending) {
-        sessionStorage.setItem('pending_first_login', JSON.stringify(pending));
-      } else {
-        sessionStorage.removeItem('pending_first_login');
-      }
-    } catch {
-      // ignore
-    }
-
-    set({ pendingFirstLoginUser: pending });
-  },
-
-  setLoading: (loading) => set({ isLoading: loading }),
-
-  setUser: (user) => set({ user }),
-  setRole: (role) => set({ role }),
-  setPermissions: (permissions) => set({ permissions }),
-
-  hasPermission: (code: string) => {
-    const { user, role, permissions } = get();
-    if (!user) return false;
-    if (role?.id === 'admin' || user.roleId === 'admin') return true;
-    return permissions.includes(code);
-  },
-
-  hasAnyPermission: (codes: string[]) => {
-    const { user, role, permissions } = get();
-    if (!user) return false;
-    if (role?.id === 'admin' || user.roleId === 'admin') return true;
-    return codes.some((code) => permissions.includes(code));
-  },
-
-  hasAllPermissions: (codes: string[]) => {
-    const { user, role, permissions } = get();
-    if (!user) return false;
-    if (role?.id === 'admin' || user.roleId === 'admin') return true;
-    return codes.every((code) => permissions.includes(code));
-  }
+  setPendingFirstLoginUser: (pendingFirstLoginUser) =>
+    set({ pendingFirstLoginUser }),
+  setLoading: (isLoading) => set({ isLoading }),
+  hasPermission: (code) =>
+    !!get().user &&
+    !get().user.is_first_login &&
+    (get().role?.id === "admin" || get().permissions.includes(code)),
+  hasAnyPermission: (codes) => codes.some((code) => get().hasPermission(code)),
+  hasAllPermissions: (codes) =>
+    !!get().user &&
+    !get().user.is_first_login &&
+    codes.every((code) => get().hasPermission(code)),
 }));
