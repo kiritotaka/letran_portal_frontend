@@ -15,31 +15,31 @@ import {
   History
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { usePermissions, useUsers, useRoles, useAuditLogs } from '../hooks/useApiQueries';
+import { usePermissions, useUsers, useAuditLogs } from '../hooks/useApiQueries';
 import { PermissionModule } from '../types';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, role, permissions, hasPermission } = useAuth();
 
-  // Declarative React Query fetching
-  const { data: permData } = usePermissions();
-  const { data: usersData } = useUsers();
-  const { data: roles = [] } = useRoles();
-  const { data: auditData } = useAuditLogs({ limit: 5 });
+  const canViewPermissions = hasPermission('PERM_VIEW');
+  const canViewUsers = hasPermission('USER_VIEW');
+  const canViewAudit = hasPermission('settings.audit');
+  const { data: permData } = usePermissions({ enabled: canViewPermissions });
+  const { data: usersData } = useUsers(undefined, { enabled: canViewUsers });
+  const { data: auditData } = useAuditLogs({ limit: 5 }, { enabled: canViewAudit });
 
   const modules: PermissionModule[] = permData?.modules || [];
   const totalUsers = usersData?.pagination?.total ?? (usersData?.users?.length ?? 0);
-  const totalRoles = roles.length;
   const recentLogs = auditData?.logs?.slice(0, 5) || [];
 
-  const totalPermissionsCount = modules.flatMap((m) => m.permissions).length || 18;
-  const userPermCount = role?.id === 'admin' ? totalPermissionsCount : permissions.length;
+  const totalPermissionsCount = canViewPermissions && permData ? permData.totalCount : undefined;
+  const userPermCount = role?.id === 'admin' ? (totalPermissionsCount ?? 'Toàn bộ') : permissions.length;
 
   const quickFeatures = [
     {
-      title: 'Cây Phân Quyền & Vai Trò',
-      description: 'Cấu hình chi tiết ma trận phân quyền dạng cây cho từng vai trò',
+      title: 'Danh Sách Quyền',
+      description: 'Xem các quyền truy cập theo nhóm chức năng',
       path: '/permissions',
       perm: 'PERM_VIEW',
       icon: ShieldCheck,
@@ -47,7 +47,7 @@ export const DashboardPage: React.FC = () => {
     },
     {
       title: 'Quản Lý Người Dùng',
-      description: 'Danh sách nhân sự, gán vai trò và cờ đổi mật khẩu lần đầu',
+      description: 'Xem thông tin tài khoản và cập nhật quyền truy cập',
       path: '/users',
       perm: 'USER_VIEW',
       icon: Users,
@@ -113,12 +113,12 @@ export const DashboardPage: React.FC = () => {
               {role?.name || user?.roleId}
             </span>
             . Bạn đang nắm giữ{' '}
-            <strong className="text-emerald-400 font-semibold">{userPermCount}</strong> /{' '}
-            {totalPermissionsCount} quyền trong hệ thống.
+            <strong className="text-emerald-400 font-semibold">{userPermCount}</strong>
+            {totalPermissionsCount !== undefined && <> / {totalPermissionsCount}</>} quyền trong hệ thống.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
-            <button
+            {hasPermission('PERM_VIEW') && <button
               type="button"
               id="btn-dash-go-permissions"
               onClick={() => navigate('/permissions')}
@@ -126,21 +126,21 @@ export const DashboardPage: React.FC = () => {
             >
               <span>Xem Cây Phân Quyền Chi Tiết</span>
               <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
+            </button>}
+            {hasPermission('USER_VIEW') && <button
               type="button"
               onClick={() => navigate('/users')}
               className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/15 text-white rounded-xl text-xs font-medium border border-white/10 transition-colors"
             >
               <span>Quản Lý Người Dùng & First Login</span>
-            </button>
+            </button>}
           </div>
         </div>
       </div>
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        {canViewUsers && <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">Người Dùng Đã Cấp</span>
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -154,23 +154,23 @@ export const DashboardPage: React.FC = () => {
           <span className="text-[11px] text-emerald-600 font-medium mt-1 block">
             Hỗ trợ cờ is_first_login
           </span>
-        </div>
+        </div>}
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        {canViewPermissions && <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Vai Trò Người Dùng</span>
+            <span className="text-xs font-semibold text-slate-500">Nhóm Quyền</span>
             <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{totalRoles}</span>
-            <span className="text-[11px] text-slate-400">nhóm vai trò</span>
+            <span className="text-2xl font-bold text-slate-900">{modules.length}</span>
+            <span className="text-[11px] text-slate-400">nhóm quyền</span>
           </div>
           <span className="text-[11px] text-indigo-600 font-medium mt-1 block">
-            Super Admin mặc định
+            Phân nhóm theo chức năng
           </span>
-        </div>
+        </div>}
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between">
@@ -181,7 +181,7 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-emerald-600">{userPermCount}</span>
-            <span className="text-[11px] text-slate-400">/ {totalPermissionsCount} quyền</span>
+            <span className="text-[11px] text-slate-400">{totalPermissionsCount !== undefined ? `/ ${totalPermissionsCount} quyền` : 'quyền'}</span>
           </div>
           <span className="text-[11px] text-slate-500 font-medium mt-1 block">
             {role?.id === 'admin' ? 'Toàn bộ quyền hạn' : 'Được giới hạn theo vai trò'}
@@ -215,7 +215,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {quickFeatures.map((feat) => {
+          {quickFeatures.filter((feat) => !feat.perm || hasPermission(feat.perm)).map((feat) => {
             const Icon = feat.icon;
             const isAllowed = !feat.perm || hasPermission(feat.perm);
 
@@ -269,7 +269,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Audit Logs Summary */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+      {canViewAudit && <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-slate-500" />
@@ -277,13 +277,13 @@ export const DashboardPage: React.FC = () => {
               Nhật Ký Hoạt Động Gần Nhất (Audit Trail)
             </h3>
           </div>
-          <button
+          {hasPermission('settings.audit') && <button
             type="button"
             onClick={() => navigate('/audit-logs')}
             className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
           >
             Xem tất cả nhật ký →
-          </button>
+          </button>}
         </div>
 
         <div className="divide-y divide-slate-100">
@@ -306,7 +306,7 @@ export const DashboardPage: React.FC = () => {
             ))
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 };

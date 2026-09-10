@@ -1,3 +1,103 @@
+export interface UserListItem {
+  id: string;
+  email: string;
+  is_super_admin: boolean;
+  is_first_login: boolean;
+  created_at: string;
+  updated_at: string;
+  permissions: string[];
+  is_active?: boolean;
+}
+
+export interface UserDetail extends UserListItem {
+  is_active: boolean;
+}
+
+export interface UserDetailResponse {
+  success: boolean;
+  data: UserDetail;
+  message?: string;
+}
+
+export interface UpdateUserInput {
+  email: string;
+  permission_ids: number[];
+  is_super_admin: boolean;
+  is_active: boolean;
+}
+
+export interface ApiPagination {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+}
+
+export interface DocumentRequest {
+  id: string;
+  task_id: string;
+  template_id: string;
+  title: string;
+  status: string;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentRequestsResponse {
+  success: boolean;
+  data: { items: DocumentRequest[]; pagination: ApiPagination };
+  message?: string;
+}
+
+export interface DocumentTypeListItem {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+}
+
+export interface DocumentTypesResponse {
+  success: boolean;
+  data: { items: DocumentTypeListItem[]; pagination: ApiPagination };
+  message?: string;
+}
+
+export interface PermissionListItem {
+  id: number;
+  permission_code: string;
+  permission_name: string;
+  group_id: number;
+  group: {
+    id: number;
+    group_name: string;
+    description: string;
+  };
+}
+
+export interface PermissionsResponse {
+  success: boolean;
+  data: { items: PermissionListItem[]; pagination: ApiPagination };
+}
+
+export interface CreateUserInput {
+  email: string;
+  password: string;
+  permission_ids: number[];
+  is_super_admin: boolean;
+}
+
+export interface UsersResponse {
+  success: boolean;
+  data: {
+    items: UserListItem[];
+    pagination: ApiPagination;
+  };
+}
+
 export interface User {
   id: string;
   email: string;

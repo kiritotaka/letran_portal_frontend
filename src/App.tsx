@@ -14,9 +14,13 @@ import FirstLoginChangePasswordPage from './pages/FirstLoginChangePasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import PermissionsPage from './pages/PermissionsPage';
 import UsersPage from './pages/UsersPage';
+import CreateUserPage from './pages/CreateUserPage';
+import UserDetailPage from './pages/UserDetailPage';
 import HRPage from './pages/HRPage';
 import ReportsPage from './pages/ReportsPage';
 import DocumentsPage from './pages/DocumentsPage';
+import CreateDocumentRequestPage from './pages/CreateDocumentRequestPage';
+import DocumentRequestDetailPage from './pages/DocumentRequestDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import AuditLogsPage from './pages/AuditLogsPage';
 import ForbiddenPage from './pages/ForbiddenPage';
@@ -67,6 +71,22 @@ export default function App() {
 
               {/* Users Management */}
               <Route
+                path="users/:userId"
+                element={
+                  <ProtectedRoute requiredPermission="USER_VIEW">
+                    <UserDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="users/new"
+                element={
+                  <ProtectedRoute requiredPermission="USER_CREATE">
+                    <CreateUserPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="users"
                 element={
                   <ProtectedRoute requiredPermission="USER_VIEW">
@@ -83,6 +103,8 @@ export default function App() {
 
               {/* Documents (Protected by withAuthorization HOC inside the page) */}
               <Route path="documents" element={<DocumentsPage />} />
+              <Route path="documents/new" element={<CreateDocumentRequestPage />} />
+              <Route path="documents/:requestId" element={<DocumentRequestDetailPage />} />
 
               {/* Settings (Protected by withAuthorization HOC inside the page) */}
               <Route path="settings" element={<SettingsPage />} />

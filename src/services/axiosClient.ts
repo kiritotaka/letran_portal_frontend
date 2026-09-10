@@ -86,6 +86,11 @@ axiosClient.interceptors.response.use(
       error.config.loadingStarted = false;
     }
 
+    // Navigation and query cleanup can cancel requests without a network failure.
+    if (axios.isCancel(error) || error.code === "ERR_CANCELED") {
+      return Promise.reject(error);
+    }
+
     const config = error.config;
     if (
       error.response?.status === 401 &&
@@ -111,8 +116,12 @@ axiosClient.interceptors.response.use(
     const shouldSkipNotification = config?.skipGlobalError;
 
     if (!shouldSkipNotification) {
-      if (!error.response) {
-        // Network Error or timeout
+      if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+        notify.error(
+          "Máy chủ chưa phản hồi trong thời gian chờ. Vui lòng thử lại.",
+          "Hết thời gian chờ",
+        );
+      } else if (!error.response) {
         notify.error(
           `Không thể kết nối đến máy chủ (${API_BASE_URL}). Vui lòng kiểm tra kết nối mạng hoặc biến môi trường VITE_API_URL.`,
           "Lỗi kết nối mạng",

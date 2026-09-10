@@ -38,7 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       icon: LayoutDashboard
     },
     {
-      name: 'Phân Quyền Vai Trò',
+      name: 'Danh Sách Quyền',
       path: '/permissions',
       icon: ShieldCheck,
       requiredPermission: 'PERM_VIEW',
@@ -75,12 +75,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     {
       name: 'Cài Đặt Hệ Thống',
       path: '/settings',
-      icon: Settings
+      icon: Settings,
+      requiredPermission: 'settings.view'
     },
     {
       name: 'Nhật Ký Kiểm Toán',
       path: '/audit-logs',
-      icon: History
+      icon: History,
+      requiredPermission: 'settings.audit'
     }
   ];
 
@@ -131,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             Menu Chức Năng
           </div>
 
-          {navItems.map((item) => {
+          {navItems.filter((item) => !item.requiredPermission || hasPermission(item.requiredPermission)).map((item) => {
             const Icon = item.icon;
             const isAllowed = !item.requiredPermission || hasPermission(item.requiredPermission);
 

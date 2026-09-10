@@ -1,81 +1,25 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { permissionsApi, usersApi, systemApi, employeesApi, documentsApi } from '../services/api';
+import { usersApi, systemApi, employeesApi, documentsApi, documentTypesApi } from '../services/api';
 import { notify } from '../stores/notificationStore';
-import { User, Role, Employee, UploadedDocument, PaginationMeta } from '../types';
+import { Employee, PaginationMeta, CreateUserInput, UpdateUserInput } from '../types';
+import { loadPermissionModules } from '../services/permissions';
 
 // ==================== QUERY KEYS ====================
 export const QUERY_KEYS = {
   PERMISSIONS: ['permissions'],
-  ROLES: ['roles'],
   USERS: ['users'],
   AUDIT_LOGS: ['audit_logs'],
   EMPLOYEES: ['employees'],
-  DOCUMENTS: ['documents']
+  DOCUMENTS: ['document-requests'],
+  DOCUMENT_TYPES: ['document-types']
 };
 
 // ==================== PERMISSIONS & ROLES HOOKS ====================
-export const usePermissions = () => {
+export const usePermissions = (options?: { enabled?: boolean }) => {
   return useQuery({
+    enabled: options?.enabled ?? true,
     queryKey: QUERY_KEYS.PERMISSIONS,
-    queryFn: async () => {
-      const res = await permissionsApi.getAll();
-      return (res as any).data || res;
-    }
-  });
-};
-
-export const useRoles = () => {
-  return useQuery({
-    queryKey: QUERY_KEYS.ROLES,
-    queryFn: async () => {
-      const res = await permissionsApi.getRoles();
-      return (res as any).data?.roles || (res as any).roles || [];
-    }
-  });
-};
-
-export const useUpdateRolePermissions = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ roleId, permissions }: { roleId: string; permissions: string[] }) =>
-      permissionsApi.updateRolePermissions(roleId, permissions),
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ROLES });
-      notify.success('Cập nhật phân quyền cho vai trò thành công!');
-    }
-  });
-};
-
-export const useCreateRole = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({
-      name,
-      description,
-      permissions
-    }: {
-      name: string;
-      description: string;
-      permissions: string[];
-    }) => permissionsApi.createRole(name, description, permissions),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ROLES });
-      notify.success('Tạo vai trò người dùng mới thành công!');
-    }
-  });
-};
-
-export const useDeleteRole = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (roleId: string) => permissionsApi.deleteRole(roleId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ROLES });
-      notify.success('Đã xóa vai trò thành công!');
-    }
+    queryFn: ({ signal }) => loadPermissionModules(signal)
   });
 };
 
@@ -84,21 +28,22 @@ export const useUsers = (params?: {
   page?: number;
   limit?: number;
   search?: string;
-  roleId?: string;
-}) => {
+}, options?: { enabled?: boolean }) => {
   return useQuery({
+    enabled: options?.enabled ?? true,
     queryKey: [QUERY_KEYS.USERS, params],
     queryFn: async () => {
       const res = await usersApi.getAll(params);
-      const resData = res.data;
-      const usersList: User[] = resData.users || resData.data || [];
-      const pagination: PaginationMeta = resData.pagination || {
-        page: params?.page || 1,
-        limit: params?.limit || 10,
-        total: usersList.length,
-        totalPages: 1
+      const { items, pagination: meta } = res.data;
+      const pagination: PaginationMeta = {
+        page: meta.page,
+        limit: meta.page_size,
+        total: meta.total,
+        totalPages: meta.total_pages,
+        hasNextPage: meta.has_next,
+        hasPrevPage: meta.has_previous
       };
-      return { users: usersList, pagination };
+      return { users: items, pagination };
     }
   });
 };
@@ -107,20 +52,10 @@ export const useCreateUser = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: {
-      email: string;
-      name: string;
-      roleId: string;
-      department?: string;
-      is_first_login?: boolean;
-      password?: string;
-    }) => usersApi.createUser(data),
-    onSuccess: (data: any) => {
+    mutationFn: (data: CreateUserInput) => usersApi.createUser(data),
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
-      const user = data?.data?.user || data?.user;
-      notify.success(
-        `Đã tạo tài khoản ${user?.email || ''} (is_first_login=${user?.is_first_login})`
-      );
+      notify.success(`Đã tạo tài khoản ${variables.email}`);
     }
   });
 };
@@ -129,7 +64,7 @@ export const useUpdateUser = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<User> }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateUserInput }) =>
       usersApi.updateUser(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
@@ -138,24 +73,25 @@ export const useUpdateUser = () => {
   });
 };
 
-export const useResetFirstLogin = () => {
+export const useDeactivateUser = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (id: string) => usersApi.resetFirstLogin(id),
-    onSuccess: (data: any) => {
+    mutationFn: (id: string) => usersApi.deactivate(id),
+    onSuccess: (user) => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
-      const user = data?.data?.user || data?.user;
-      notify.success(
-        `Đã kích hoạt cờ is_first_login=true cho ${user?.email || 'người dùng'}. Mật khẩu tạm: Temp@12345`
-      );
-    }
+      if (user.is_active) {
+        notify.error('Máy chủ vẫn trả về tài khoản đang hoạt động. Vui lòng kiểm tra lại.');
+      } else {
+        notify.success(`Đã vô hiệu hóa tài khoản ${user.email}`);
+      }
+    },
   });
 };
 
 // ==================== AUDIT LOGS & SYSTEM ====================
-export const useAuditLogs = (params?: { page?: number; limit?: number; search?: string }) => {
+export const useAuditLogs = (params?: { page?: number; limit?: number; search?: string }, options?: { enabled?: boolean }) => {
   return useQuery({
+    enabled: options?.enabled ?? true,
     queryKey: [QUERY_KEYS.AUDIT_LOGS, params],
     queryFn: async () => {
       const res = await systemApi.getAuditLogs(params);
@@ -235,25 +171,36 @@ export const useDeleteEmployee = () => {
 };
 
 // ==================== DOCUMENTS HOOKS ====================
+export const useDocumentTypes = () => useQuery({
+  queryKey: QUERY_KEYS.DOCUMENT_TYPES,
+  queryFn: async ({ signal }) => {
+    const response = await documentTypesApi.getList(signal);
+    if (!response.success) throw new Error(response.message || 'Không thể tải loại tài liệu.');
+    return response.data;
+  },
+});
+
 export const useDocuments = (params?: {
   page?: number;
-  limit?: number;
+  page_size?: number;
+  document_type_id?: string;
   search?: string;
-  documentTypeId?: string;
 }) => {
   return useQuery({
     queryKey: [QUERY_KEYS.DOCUMENTS, params],
-    queryFn: async () => {
-      const res = await documentsApi.getAll(params);
-      const resData = res.data;
-      const docsList: UploadedDocument[] = resData.data || [];
-      const pagination: PaginationMeta = resData.pagination || {
-        page: params?.page || 1,
-        limit: params?.limit || 5,
-        total: docsList.length,
-        totalPages: 1
+    queryFn: async ({ signal }) => {
+      const res = await documentsApi.getAll(params, signal);
+      if (!res.success) throw new Error(res.message || 'Không thể tải danh sách tài liệu.');
+      const { items, pagination: meta } = res.data;
+      const pagination: PaginationMeta = {
+        page: meta.page,
+        limit: meta.page_size,
+        total: meta.total,
+        totalPages: meta.total_pages,
+        hasNextPage: meta.has_next,
+        hasPrevPage: meta.has_previous,
       };
-      return { documents: docsList, pagination };
+      return { documents: items, pagination };
     }
   });
 };

@@ -2,10 +2,14 @@ import type { SessionResponse, PasswordResponse } from "./sessionTypes";
 import axiosClient from "./axiosClient";
 import {
   ApiResponse,
-  PermissionModule,
-  Role,
-  User,
+  PermissionsResponse,
+  CreateUserInput,
+  UpdateUserInput,
+  UserDetailResponse,
+  UsersResponse,
   DocumentType,
+  DocumentRequestsResponse,
+  DocumentTypesResponse,
   UploadedDocument,
   PaginationMeta,
   Employee,
@@ -48,37 +52,15 @@ export const authApi = {
 
 // PERMISSIONS & ROLES APIs
 export const permissionsApi = {
-  getAll: () =>
-    axiosClient.get<{
-      success: boolean;
-      modules: PermissionModule[];
-      allCodes: string[];
-      totalCount: number;
-    }>("/permissions"),
+  // API_BASE_URL already includes /api/v1.
+  getAll: (page?: number, signal?: AbortSignal) =>
+    axiosClient.get<PermissionsResponse, PermissionsResponse>("/permissions", {
+      params: page === undefined ? undefined : { page },
+      signal,
+      skipLoading: true,
+    }),
 
-  getRoles: () =>
-    axiosClient.get<{
-      success: boolean;
-      roles: Role[];
-    }>("/roles"),
 
-  createRole: (name: string, description: string, permissions: string[]) =>
-    axiosClient.post<{
-      success: boolean;
-      role: Role;
-    }>("/roles", { name, description, permissions }),
-
-  updateRolePermissions: (roleId: string, permissions: string[]) =>
-    axiosClient.put<{
-      success: boolean;
-      role: Role;
-    }>(`/roles/${roleId}/permissions`, { permissions }),
-
-  deleteRole: (roleId: string) =>
-    axiosClient.delete<{
-      success: boolean;
-      message: string;
-    }>(`/roles/${roleId}`),
 };
 
 // USERS APIs (Hỗ trợ Server-side search, lọc và phân trang)
@@ -87,48 +69,42 @@ export const usersApi = {
     page?: number;
     limit?: number;
     search?: string;
-    roleId?: string;
   }) => {
     const query = new URLSearchParams();
     if (params?.page) query.append("page", String(params.page));
     if (params?.limit) query.append("limit", String(params.limit));
     if (params?.search) query.append("search", params.search);
-    if (params?.roleId && params.roleId !== "all")
-      query.append("roleId", params.roleId);
     const qs = query.toString();
-    return axiosClient.get<{
-      success: boolean;
-      users: User[];
-      data: User[];
-      pagination: PaginationMeta;
-    }>(qs ? `/users?${qs}` : "/users");
+    return axiosClient.get<UsersResponse, UsersResponse>(
+      qs ? `/users?${qs}` : "/users",
+    );
   },
 
-  createUser: (data: {
-    email: string;
-    name: string;
-    roleId: string;
-    department?: string;
-    is_first_login?: boolean;
-    password?: string;
-  }) =>
-    axiosClient.post<{
-      success: boolean;
-      user: User;
-    }>("/users", data),
+  createUser: async (data: CreateUserInput) => {
+    const response = await axiosClient.post<
+      { success: boolean; message?: string },
+      { success: boolean; message?: string }
+    >("/users", data);
+    if (!response.success) throw new Error(response.message || "Không thể tạo người dùng.");
+    return response;
+  },
 
-  updateUser: (id: string, data: Partial<User>) =>
-    axiosClient.put<{
-      success: boolean;
-      user: User;
-    }>(`/users/${id}`, data),
+  updateUser: async (id: string, data: UpdateUserInput) => {
+    const response = await axiosClient.patch<UserDetailResponse, UserDetailResponse>(
+      `/users/${encodeURIComponent(id)}`, data,
+    );
+    if (!response.success) throw new Error(response.message || "Không thể cập nhật người dùng.");
+    return response.data;
+  },
 
-  resetFirstLogin: (id: string) =>
-    axiosClient.post<{
-      success: boolean;
-      user: User;
-      tempPassword: string;
-    }>(`/users/${id}/reset-first-login`),
+  deactivate: async (id: string) => {
+    const response = await axiosClient.post<UserDetailResponse, UserDetailResponse>(
+      `/users/${encodeURIComponent(id)}/deactivate`,
+    );
+    if (!response.success) throw new Error(response.message || "Không thể vô hiệu hóa người dùng.");
+    return response.data;
+  },
+
 };
 
 // SYSTEM & AUDIT APIs (Hỗ trợ Server-side search & phân trang)
@@ -218,8 +194,14 @@ export const employeesApi = {
 
 // DOCUMENT TYPES APIs (Dùng cho Autocomplete & Tải file template mẫu)
 export const documentTypesApi = {
+  getList: (signal?: AbortSignal) =>
+    axiosClient.get<DocumentTypesResponse, DocumentTypesResponse>("/document-types", {
+      params: { page: 1, page_size: 100 },
+      signal,
+      skipLoading: true,
+    }),
   getAll: (q?: string) =>
-    axiosClient.get<{ success: boolean; data: DocumentType[] }>(
+    axiosClient.get<{ success: boolean; data: DocumentType[] }, { success: boolean; data: DocumentType[] }>(
       q ? `/document-types?q=${encodeURIComponent(q)}` : "/document-types",
       { skipLoading: true }, // skip loading overlay để trải nghiệm gõ autocomplete mượt mà
     ),
@@ -229,25 +211,23 @@ export const documentTypesApi = {
 
 // DOCUMENTS APIs (Kho tài liệu với Server-side search & phân trang)
 export const documentsApi = {
-  getAll: (params?: {
+  getAll: (params: {
     page?: number;
-    limit?: number;
+    page_size?: number;
+    document_type_id?: string;
     search?: string;
-    documentTypeId?: string;
-  }) => {
-    const query = new URLSearchParams();
-    if (params?.page) query.append("page", String(params.page));
-    if (params?.limit) query.append("limit", String(params.limit));
-    if (params?.search) query.append("search", params.search);
-    if (params?.documentTypeId && params.documentTypeId !== "all")
-      query.append("documentTypeId", params.documentTypeId);
-    const qs = query.toString();
-    return axiosClient.get<{
-      success: boolean;
-      data: UploadedDocument[];
-      pagination: PaginationMeta;
-    }>(qs ? `/documents?${qs}` : "/documents");
-  },
+  } = {}, signal?: AbortSignal) =>
+    axiosClient.get<DocumentRequestsResponse, DocumentRequestsResponse>(
+      "/document-requests", {
+        params: {
+          page: params.page ?? 1,
+          page_size: params.page_size ?? 5,
+          document_type_id: params.document_type_id || undefined,
+          search: params.search?.trim() || undefined,
+        },
+        signal,
+      },
+    ),
   uploadSingle: (payload: {
     documentTypeId: string;
     documentTypeName: string;
